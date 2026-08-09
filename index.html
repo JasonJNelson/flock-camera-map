@@ -6,7 +6,7 @@
   <title>ALPR Camera Map</title>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0b0f14; font-family: system-ui, sans-serif; color: #f1f5f9; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #1a1a1a; font-family: system-ui, sans-serif; color: #0f172a; }
     #map { position: absolute; inset: 0; width: 100%; height: 100%; }
 
     .bar {
@@ -15,50 +15,56 @@
       pointer-events: none;
     }
     .bar > * { pointer-events: auto; }
-    .logo { font-weight: 800; font-size: 15px; text-shadow: 0 1px 4px #000; }
-    .logo b { color: #ef4444; }
+    .logo {
+      font-weight: 800; font-size: 15px; color: #0f172a;
+      background: rgba(255,255,255,0.92); padding: 6px 10px; border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    }
+    .logo b { color: #dc2626; }
     input, button {
-      border: 1px solid #334155; background: #0f172a; color: #e2e8f0;
+      border: 1px solid #cbd5e1; background: #fff; color: #0f172a;
       border-radius: 8px; padding: 8px 12px; font-size: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12);
     }
     input { flex: 1; min-width: 160px; max-width: 320px; }
-    input:focus { outline: 1px solid #ef4444; }
+    input:focus { outline: 2px solid #dc2626; border-color: #dc2626; }
     button { cursor: pointer; font-weight: 600; }
-    button:hover { border-color: #ef4444; }
+    button:hover { border-color: #dc2626; color: #dc2626; }
 
     .card {
       position: absolute; z-index: 2; left: 12px; top: 58px;
-      background: rgba(15, 23, 42, 0.92); border: 1px solid #334155;
+      background: rgba(255,255,255,0.95); border: 1px solid #e2e8f0;
       border-radius: 12px; padding: 10px 14px; min-width: 140px;
-      box-shadow: 0 8px 24px rgba(0,0,0,.45);
+      box-shadow: 0 8px 24px rgba(0,0,0,.18);
     }
-    .card .k { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; }
-    .card .v { font-size: 22px; font-weight: 800; color: #ef4444; }
-    .card .s { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+    .card .k { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .06em; }
+    .card .v { font-size: 22px; font-weight: 800; color: #dc2626; }
+    .card .s { font-size: 12px; color: #64748b; margin-top: 2px; }
 
     .info {
       position: absolute; z-index: 2; right: 12px; top: 58px; width: min(320px, calc(100vw - 24px));
       max-height: calc(100vh - 80px); overflow: auto;
-      background: rgba(15, 23, 42, 0.95); border: 1px solid #334155;
+      background: rgba(255,255,255,0.97); border: 1px solid #e2e8f0;
       border-radius: 12px; padding: 14px; font-size: 13px; line-height: 1.45;
-      box-shadow: 0 8px 24px rgba(0,0,0,.45);
+      box-shadow: 0 8px 24px rgba(0,0,0,.18);
     }
     .info.hidden { display: none; }
     .info h2 { margin: 0 0 8px; font-size: 15px; }
-    .info h3 { margin: 12px 0 4px; font-size: 13px; color: #fbbf24; }
-    .info p, .info li { color: #94a3b8; margin: 0 0 6px; }
+    .info h3 { margin: 12px 0 4px; font-size: 13px; color: #b45309; }
+    .info p, .info li { color: #475569; margin: 0 0 6px; }
     .info ul { padding-left: 18px; margin: 0; }
-    .info a { color: #60a5fa; }
-    .info .x { float: right; background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; line-height: 1; padding: 0; }
+    .info a { color: #2563eb; }
+    .info .x { float: right; background: none; border: none; color: #64748b; font-size: 20px; cursor: pointer; line-height: 1; padding: 0; box-shadow: none; }
 
     .legend {
       position: absolute; z-index: 2; left: 12px; bottom: 28px;
-      background: rgba(15, 23, 42, 0.9); border: 1px solid #334155;
+      background: rgba(255,255,255,0.95); border: 1px solid #e2e8f0;
       border-radius: 8px; padding: 6px 10px; font-size: 12px;
       display: flex; gap: 10px; align-items: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12);
     }
     .grad { width: 48px; height: 8px; border-radius: 4px; background: linear-gradient(90deg,#3b82f6,#eab308,#ef4444); }
-    .dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; display: inline-block; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #dc2626; display: inline-block; }
 
     #err {
       display: none; position: absolute; z-index: 5; left: 50%; top: 50%;
@@ -101,8 +107,8 @@
       <li>100k+ cameras claimed by Flock</li>
     </ul>
     <p style="margin-top:10px;font-size:11px">
-      Data via <a href="https://dontgetflocked.com" target="_blank" rel="noopener">tiles.dontgetflocked.com</a>.
-      Not affiliated. Coverage is incomplete.
+      Basemap © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors.
+      Camera tiles via <a href="https://dontgetflocked.com" target="_blank" rel="noopener">dontgetflocked</a>. Not affiliated.
     </p>
   </div>
 
@@ -126,6 +132,16 @@
         return;
       }
 
+      // OpenStreetMap raster tile servers (MapLibre needs full URLs; no {s} placeholder)
+      // Primary: official OSM tiles. Fallbacks: community mirrors.
+      // See https://operations.osmfoundation.org/policies/tiles/
+      var OSM_TILES = [
+        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+      ];
+
       var map = new maplibregl.Map({
         container: 'map',
         style: {
@@ -133,13 +149,10 @@
           sources: {
             basemap: {
               type: 'raster',
-              tiles: [
-                'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-                'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
-                'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'
-              ],
+              tiles: OSM_TILES,
               tileSize: 256,
-              attribution: '© OpenStreetMap © CARTO'
+              attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+              maxzoom: 19
             },
             cameras: {
               type: 'vector',
@@ -160,14 +173,14 @@
                 'heatmap-weight': 1,
                 'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 0.5, 10, 1.5],
                 'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 2, 10, 20],
-                'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 10, 1, 12, 0],
+                'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.85, 12, 0],
                 'heatmap-color': [
                   'interpolate', ['linear'], ['heatmap-density'],
                   0, 'rgba(0,0,0,0)',
-                  0.2, 'rgba(59,130,246,0.6)',
-                  0.5, 'rgba(234,179,8,0.75)',
-                  0.8, 'rgba(249,115,22,0.9)',
-                  1, 'rgba(239,68,68,1)'
+                  0.2, 'rgba(37,99,235,0.55)',
+                  0.5, 'rgba(234,179,8,0.7)',
+                  0.8, 'rgba(249,115,22,0.85)',
+                  1, 'rgba(220,38,38,0.95)'
                 ]
               }
             },
@@ -178,28 +191,24 @@
               'source-layer': 'cameras',
               minzoom: 10,
               paint: {
-                'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 7],
-                'circle-color': '#ef4444',
-                'circle-stroke-color': '#fff',
-                'circle-stroke-width': 1.25,
-                'circle-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.4, 12, 1]
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 3.5, 14, 8],
+                'circle-color': '#dc2626',
+                'circle-stroke-color': '#ffffff',
+                'circle-stroke-width': 1.5,
+                'circle-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 12, 1]
               }
             }
           ]
         },
         center: [-98.58, 39.83],
         zoom: 4,
-        maxZoom: 16
+        maxZoom: 18
       });
 
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
 
       map.on('error', function (e) {
         console.error(e);
-        if (e && e.error && e.error.message) {
-          // Don't spam banner for individual missing tiles
-          if (String(e.error.message).indexOf('Failed to fetch') !== -1) return;
-        }
       });
 
       function updateCount() {
@@ -237,7 +246,7 @@
         if (!f) return;
         var p = f.properties || {};
         var name = p.brand || p.manufacturer || 'ALPR camera';
-        var html = '<strong style="color:#ef4444">' + name + '</strong>';
+        var html = '<strong style="color:#dc2626">' + name + '</strong>';
         if (p.operator) html += '<br>Operator: ' + p.operator;
         if (p.directionCardinal || p.direction) html += '<br>Dir: ' + (p.directionCardinal || p.direction);
         new maplibregl.Popup().setLngLat(e.lngLat).setHTML(html).addTo(map);
@@ -249,7 +258,9 @@
         if (e.key !== 'Enter') return;
         var q = e.target.value.trim();
         if (!q) return;
-        fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=' + encodeURIComponent(q))
+        fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=' + encodeURIComponent(q), {
+          headers: { 'Accept-Language': 'en' }
+        })
           .then(function (r) { return r.json(); })
           .then(function (data) {
             if (!data || !data[0]) { alert('Not found'); return; }
