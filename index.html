@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flock & ALPR Camera Tracker | Nationwide Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --accent: #e74c3c;
+      --text: #e8eef7;
+      --muted: #8b9bb4;
+      --border: #2a3548;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      z-index: 1000;
+    }
+    header h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .controls {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+      flex: 1;
+    }
+    input[type="text"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.45rem 0.75rem;
+      border-radius: 6px;
+      min-width: 200px;
+      font-size: 0.9rem;
+    }
+    button, select {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.45rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    button.secondary { background: #2a3548; }
+    button:hover { filter: brightness(1.1); }
+    #map { flex: 1; width: 100%; z-index: 1; }
+    .info-panel {
+      position: absolute;
+      top: 70px;
+      right: 12px;
+      width: 340px;
+      max-height: calc(100vh - 100px);
+      overflow-y: auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+      z-index: 900;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+    .info-panel h2 { font-size: 1rem; margin-bottom: 0.6rem; color: var(--accent); }
+    .info-panel h3 { font-size: 0.92rem; margin: 0.9rem 0 0.35rem; color: #f0a500; }
+    .info-panel p, .info-panel ul { margin-bottom: 0.55rem; color: var(--muted); }
+    .info-panel ul { padding-left: 1.1rem; }
+    .info-panel a { color: #5dade2; }
+    .stats { display: flex; gap: 0.75rem; margin: 0.6rem 0; flex-wrap: wrap; }
+    .stat { background: var(--bg); padding: 0.35rem 0.6rem; border-radius: 5px; font-size: 0.8rem; }
+    .stat strong { color: var(--accent); }
+    .close-btn {
+      float: right;
+      background: transparent;
+      color: var(--muted);
+      font-size: 1.2rem;
+      padding: 0 0.3rem;
+      line-height: 1;
+    }
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(15,20,25,0.92);
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      z-index: 1000;
+      display: none;
+      text-align: center;
+      max-width: 280px;
+    }
+    .leaflet-popup-content { color: #222; font-size: 0.85rem; }
+    @media (max-width: 700px) {
+      .info-panel { width: calc(100% - 24px); right: 12px; left: 12px; max-height: 45vh; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Flock & ALPR Tracker</h1>
+    <div class="controls">
+      <input type="text" id="search" placeholder="City, address, or ZIP..." />
+      <button onclick="geocodeSearch()">Search</button>
+      <select id="filter">
+        <option value="all">All ALPR</option>
+        <option value="flock" selected>Flock Safety only</option>
+      </select>
+      <button class="secondary" onclick="loadCameras(true)">Refresh View</button>
+      <button class="secondary" onclick="toggleInfo()">Info</button>
+    </div>
+  </header>
+
+  <div id="map"></div>
+  <div class="loading" id="loading">
+    Loading cameras…<br>
+    <small id="loadStatus" style="color:#8b9bb4"></small>
+  </div>
+
+  <div class="info-panel" id="infoPanel">
+    <button class="close-btn" onclick="toggleInfo()">×</button>
+    <h2>What Flock Cameras Do</h2>
+    <p><strong>Flock Safety</strong> makes automated license plate readers (ALPRs). They continuously photograph vehicles and turn the images into searchable data.</p>
+    <h3>What they capture</h3>
+    <ul>
+      <li>License plate number</li>
+      <li>Make, model, color, body type</li>
+      <li>Distinctive features (stickers, racks, damage…)</li>
+      <li>Exact time + location of the pass</li>
+    </ul>
+    <p>No facial recognition — focus is on the vehicle.</p>
+    <h3>How the network works</h3>
+    <ul>
+      <li>Used by police, HOAs, businesses, schools</li>
+      <li>Default retention ≈ 30 days (agencies can set longer)</li>
+      <li>Agencies can search each other’s data + receive hotlist alerts</li>
+      <li>Flock claims 120k+ cameras across 49 states</li>
+    </ul>
+    <h3>About this map</h3>
+    <p>Locations come from the open OpenStreetMap database (same source used by DeFlock). Coverage is incomplete and volunteer-maintained.</p>
+    <div class="stats">
+      <div class="stat">Cameras in view: <strong id="count">—</strong></div>
+    </div>
+    <p style="margin-top:1rem;font-size:0.8rem;">
+      Data: OpenStreetMap via Overpass mirrors<br>
+      Tiles: OpenStreetMap / Carto<br>
+      Not affiliated with Flock Safety.
+    </p>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script>
+    // ========== RELIABLE OVERPASS ENDPOINTS (fallbacks) ==========
+    const OVERPASS_ENDPOINTS = [
+      'https://overpass.kumi.systems/api/interpreter',
+      'https://overpass.private.coffee/api/interpreter',
+      'https://z.overpass-api.de/api/interpreter',
+      'https://overpass-api.de/api/interpreter',
+      'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+    ];
+
+    const map = L.map('map', {
+      center: [39.8283, -98.5795],
+      zoom: 5,
+      zoomControl: true
+    });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      maxZoom: 19
+    }).addTo(map);
+
+    const markers = L.markerClusterGroup({
+      maxClusterRadius: 50,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false
+    });
+    map.addLayer(markers);
+
+    let loading = false;
+    let lastEndpointIndex = 0;
+
+    async function fetchWithFallback(query) {
+      const body = 'data=' + encodeURIComponent(query);
+      const errors = [];
+
+      // Try endpoints starting from last successful one
+      for (let i = 0; i < OVERPASS_ENDPOINTS.length; i++) {
+        const idx = (lastEndpointIndex + i) % OVERPASS_ENDPOINTS.length;
+        const url = OVERPASS_ENDPOINTS[idx];
+        document.getElementById('loadStatus').textContent = `Trying ${new URL(url).hostname}…`;
+
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 35000);
+
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'User-Agent': 'FlockCameraMap/1.0 (educational; contact: local-user)'
+            },
+            body,
+            signal: controller.signal,
+            mode: 'cors'
+          });
+
+          clearTimeout(timeout);
+
+          if (!response.ok) {
+            errors.push(`${url}: HTTP ${response.status}`);
+            continue;
+          }
+
+          const data = await response.json();
+          lastEndpointIndex = idx; // remember good one
+          return data;
+        } catch (err) {
+          errors.push(`${url}: ${err.name === 'AbortError' ? 'timeout' : err.message}`);
+        }
+      }
+
+      throw new Error('All Overpass mirrors failed:\n' + errors.join('\n'));
+    }
+
+    async function loadCameras(force = false) {
+      if (loading) return;
+      if (!force && map.getZoom() < 9) {
+        document.getElementById('count').textContent = 'Zoom in (≥9) to load';
+        return;
+      }
+
+      loading = true;
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('loadStatus').textContent = '';
+      markers.clearLayers();
+
+      const bounds = map.getBounds();
+      const south = bounds.getSouth().toFixed(5);
+      const west  = bounds.getWest().toFixed(5);
+      const north = bounds.getNorth().toFixed(5);
+      const east  = bounds.getEast().toFixed(5);
+
+      // Keep query modest — large bboxes often timeout
+      const query = `
+[out:json][timeout:25];
+(
+  node["surveillance:type"="ALPR"](${south},${west},${north},${east});
+);
+out body;
+`;
+
+      try {
+        const data = await fetchWithFallback(query);
+        const filter = document.getElementById('filter').value;
+        let count = 0;
+
+        (data.elements || []).forEach(el => {
+          if (el.type !== 'node' || !el.lat || !el.lon) return;
+
+          const tags = el.tags || {};
+          const manufacturer = (tags.manufacturer || tags.brand || '').toLowerCase();
+          const isFlock = manufacturer.includes('flock');
+
+          if (filter === 'flock' && !isFlock) return;
+
+          count++;
+          const popup = `
+            <strong>${isFlock ? 'Flock Safety' : (tags.manufacturer || 'ALPR Camera')}</strong><br>
+            ${tags.operator ? 'Operator: ' + tags.operator + '<br>' : ''}
+            ${tags['camera:direction'] || tags.direction ? 'Direction: ' + (tags['camera:direction'] || tags.direction) + '<br>' : ''}
+            ${tags.description ? tags.description + '<br>' : ''}
+            OSM: <a href="https://www.openstreetmap.org/node/${el.id}" target="_blank" rel="noopener">${el.id}</a>
+          `;
+
+          const icon = L.divIcon({
+            className: '',
+            html: `<div style="
+              background:${isFlock ? '#e74c3c' : '#3498db'};
+              width:12px;height:12px;border-radius:50%;
+              border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.6);
+            "></div>`,
+            iconSize: [12, 12],
+            iconAnchor: [6, 6]
+          });
+
+          L.marker([el.lat, el.lon], { icon })
+            .bindPopup(popup)
+            .addTo(markers);
+        });
+
+        document.getElementById('count').textContent = count.toLocaleString();
+      } catch (err) {
+        console.error(err);
+        document.getElementById('count').textContent = 'Error';
+        alert('Could not load cameras.\n\n' +
+              'Common fixes:\n' +
+              '• Serve the page with a local server (python -m http.server)\n' +
+              '• Zoom in closer (smaller area)\n' +
+              '• Wait 30–60 s and try Refresh\n\n' +
+              err.message);
+      } finally {
+        loading = false;
+        document.getElementById('loading').style.display = 'none';
+      }
+    }
+
+    async function geocodeSearch() {
+      const q = document.getElementById('search').value.trim();
+      if (!q) return;
+
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=us&limit=1`,
+          {
+            headers: {
+              'User-Agent': 'FlockCameraMap/1.0 (educational local tool)',
+              'Accept-Language': 'en'
+            }
+          }
+        );
+        if (!res.ok) throw new Error('Nominatim ' + res.status);
+        const results = await res.json();
+        if (!results.length) {
+          alert('Location not found');
+          return;
+        }
+        const { lat, lon } = results[0];
+        map.setView([parseFloat(lat), parseFloat(lon)], 13);
+        setTimeout(() => loadCameras(true), 500);
+      } catch (e) {
+        console.error(e);
+        alert('Search failed (Nominatim). Try again in a few seconds or type a clearer place name.');
+      }
+    }
+
+    document.getElementById('search').addEventListener('keydown', e => {
+      if (e.key === 'Enter') geocodeSearch();
+    });
+    document.getElementById('filter').addEventListener('change', () => loadCameras(true));
+
+    let moveTimeout;
+    map.on('moveend', () => {
+      clearTimeout(moveTimeout);
+      moveTimeout = setTimeout(() => {
+        if (map.getZoom() >= 9) loadCameras();
+      }, 700);
+    });
+
+    function toggleInfo() {
+      const panel = document.getElementById('infoPanel');
+      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // Initial message
+    setTimeout(() => {
+      if (map.getZoom() < 9) {
+        document.getElementById('count').textContent = 'Zoom in to load cameras';
+      }
+    }, 800);
+  </script>
+</body>
+</html>
