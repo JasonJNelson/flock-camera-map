@@ -25,18 +25,38 @@ The following measures are already in place or recommended.
 - **No credentials left on runner**  
   `persist-credentials: false` on checkout.
 
+### OIDC & deployment security checklist
+
+Use this checklist to verify the full protection stack:
+
+- [x] Request `id-token: write` only on privileged jobs (not on PR / untrusted jobs)
+- [x] Bind production deploys to a GitHub Environment (`github-pages`)
+- [x] Restrict automatic deploys to the `main` branch only
+- [x] Workflow-level permissions limited to `contents: read`
+- [ ] **Required reviewers** enabled on the `github-pages` environment
+- [ ] Deployment branches on `github-pages` limited to `main` only
+- [ ] Branch protection on `main` (PR required + at least 1 approval)
+- [ ] Required status checks (CI) must pass before merge to `main`
+- [ ] Pages source set to **GitHub Actions** (not “Deploy from a branch”)
+- [ ] Prefer immutable IDs in any external cloud OIDC trust policies
+- [ ] Pin third-party Actions to full commit SHAs where practical
+
 ### Recommended one-time configuration (Settings UI)
 
 These cannot be set via files; configure them in the GitHub web UI.
 
-#### 1. Protect the `github-pages` environment
+#### 1. Protect the `github-pages` environment (includes Required reviewers)
 
 1. Go to **Settings → Environments**
 2. Open (or create) the environment named **`github-pages`**
 3. Enable **Deployment protection rules**:
-   - **Required reviewers** — add yourself (or a trusted collaborator). This forces a manual approval before every deploy.
+   - **Required reviewers** — add yourself (or a trusted collaborator).  
+     This forces a **manual approval before every deploy**. Without this step, the OIDC token alone is not enough to stop an unauthorized push to `main` from going live.
    - **Wait timer** (optional) — e.g. 5 minutes
    - **Deployment branches and tags** — restrict to **Selected branches** → only `main`
+
+> **Why required reviewers matter with OIDC**  
+> The OIDC token proves *which* workflow and environment ran. Required reviewers add a human gate so that even a valid token from `main` cannot publish until an authorized person approves the deployment.
 
 #### 2. Protect the `main` branch
 
@@ -56,7 +76,7 @@ These cannot be set via files; configure them in the GitHub web UI.
 
 ### Site-level security headers
 
-The `index.html` includes basic browser security meta tags (Referrer-Policy, etc.).
+The `index.html` includes basic browser security meta tags (Referrer-Policy, Content-Security-Policy, etc.).
 GitHub Pages always serves over HTTPS and sets a strict HSTS policy.
 
 ### Reporting a vulnerability
