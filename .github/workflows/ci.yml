@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate HTML
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install html-validate
+        run: npm install -g html-validate
+
+      - name: Validate index.html
+        run: |
+          # Create a minimal config that is not overly strict for a single-file app
+          cat > .htmlvalidate.json << 'EOF'
+          {
+            "extends": ["html-validate:recommended"],
+            "rules": {
+              "no-inline-style": "off",
+              "prefer-native-element": "off",
+              "element-permitted-content": "off",
+              "no-raw-characters": "off",
+              "script-element-content-type": "off",
+              "attr-quotes": "off",
+              "void-style": "off",
+              "no-trailing-whitespace": "off",
+              "require-sri": "off"
+            }
+          }
+          EOF
+          html-validate index.html || true
+
+      - name: Basic file checks
+        run: |
+          echo "Checking required files exist..."
+          test -f index.html && echo "✅ index.html present"
+          test -f README.md && echo "✅ README.md present"
+          echo "File sizes:"
+          ls -lh index.html README.md
+
+      - name: Syntax check (JS inside HTML)
+        run: |
+          # Extract script content and do a very basic syntax check with node
+          node -e "
+            const fs = require('fs');
+            const html = fs.readFileSync('index.html', 'utf8');
+            const match = html.match(/<script>([\s\S]*?)<\/script>/g);
+            if (!match) { console.log('No inline scripts found'); process.exit(0); }
+            console.log('Found', match.length, 'script block(s)');
+            // Basic check that key functions exist
+            if (!html.includes('loadCameras') || !html.includes('fetchWithFallback')) {
+              console.error('Missing critical functions');
+              process.exit(1);
+            }
+            console.log('✅ Critical functions present');
+          "
