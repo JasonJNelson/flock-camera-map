@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="referrer" content="strict-origin-when-cross-origin" />
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org; connect-src 'self' https://tiles.dontgetflocked.com https://nominatim.openstreetmap.org; worker-src blob:; child-src blob:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" />
   <title>ALPR Camera Map | Flock Surveillance Tracker</title>
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <style>
@@ -22,7 +23,6 @@
     html, body { height: 100%; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
     #map { position: absolute; inset: 0; }
 
-    /* Top bar */
     .topbar {
       position: absolute; top: 0; left: 0; right: 0; z-index: 10;
       display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
@@ -56,10 +56,7 @@
       font-size: 0.85rem; font-weight: 600; cursor: pointer;
     }
     .btn:hover { border-color: var(--accent); background: var(--accent-soft); }
-    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .btn.primary:hover { filter: brightness(1.1); }
 
-    /* Stats pill */
     .stats {
       position: absolute; top: 4.2rem; left: 1rem; z-index: 10;
       background: var(--panel); border: 1px solid var(--panel-border);
@@ -70,7 +67,6 @@
     .stats .value { font-size: 1.6rem; font-weight: 800; color: var(--accent); line-height: 1.2; }
     .stats .sub { font-size: 0.75rem; color: var(--muted); margin-top: 0.15rem; }
 
-    /* Side panel */
     .panel {
       position: absolute; top: 4.2rem; right: 1rem; z-index: 10;
       width: min(340px, calc(100vw - 2rem));
@@ -92,7 +88,6 @@
       font-size: 1.3rem; cursor: pointer; line-height: 1;
     }
 
-    /* Legend */
     .legend {
       position: absolute; bottom: 1.5rem; left: 1rem; z-index: 10;
       background: var(--panel); border: 1px solid var(--panel-border);
@@ -185,8 +180,6 @@
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script>
-    // Public vector tiles from the FlockHopper / dontgetflocked pipeline
-    // (CORS-enabled, no API key required)
     const TILE_URL = 'https://tiles.dontgetflocked.com/cameras-us-hourly.json';
 
     const map = new maplibregl.Map({
@@ -210,12 +203,7 @@
           }
         },
         layers: [
-          {
-            id: 'basemap',
-            type: 'raster',
-            source: 'carto'
-          },
-          // Heatmap at low zoom (national / regional density)
+          { id: 'basemap', type: 'raster', source: 'carto' },
           {
             id: 'cameras-heat',
             type: 'heatmap',
@@ -251,7 +239,6 @@
               ]
             }
           },
-          // Individual camera dots at higher zoom
           {
             id: 'cameras-points',
             type: 'circle',
@@ -291,26 +278,17 @@
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 100 }), 'bottom-left');
 
-    // Approximate camera count in current viewport (sampled from rendered features)
     function updateCount() {
-      if (!map.getLayer('cameras-points') && !map.getLayer('cameras-heat')) return;
       const zoom = map.getZoom();
-      const bounds = map.getBounds();
       let features = [];
       try {
-        // Prefer point layer when visible
         if (zoom >= 9) {
-          features = map.queryRenderedFeatures({
-            layers: ['cameras-points']
-          });
+          features = map.queryRenderedFeatures({ layers: ['cameras-points'] });
         } else {
-          features = map.queryRenderedFeatures({
-            layers: ['cameras-heat']
-          });
+          features = map.queryRenderedFeatures({ layers: ['cameras-heat'] });
         }
       } catch (e) {}
 
-      // Deduplicate by geometry (MVT can repeat features across tiles)
       const seen = new Set();
       let count = 0;
       for (const f of features) {
@@ -343,7 +321,6 @@
       map.on('zoomend', updateCount);
     });
 
-    // Click a camera for details
     map.on('click', 'cameras-points', (e) => {
       const f = e.features[0];
       if (!f) return;
@@ -369,7 +346,6 @@
     map.on('mouseenter', 'cameras-points', () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'cameras-points', () => { map.getCanvas().style.cursor = ''; });
 
-    // Search (Nominatim)
     async function geocode(q) {
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=us&limit=1`;
       const res = await fetch(url, {
