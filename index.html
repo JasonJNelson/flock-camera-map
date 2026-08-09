@@ -5,388 +5,418 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="referrer" content="strict-origin-when-cross-origin" />
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org https://*.openstreetmap.org; connect-src 'self' https://overpass.kumi.systems https://overpass.private.coffee https://z.overpass-api.de https://overpass-api.de https://maps.mail.ru https://nominatim.openstreetmap.org; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" />
-  <title>Flock & ALPR Camera Tracker | Nationwide Map</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <title>ALPR Camera Map | Flock Surveillance Tracker</title>
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
   <style>
     :root {
-      --bg: #0f1419;
-      --panel: #1a2332;
-      --accent: #e74c3c;
-      --text: #e8eef7;
-      --muted: #8b9bb4;
-      --border: #2a3548;
+      --bg: #0b0f14;
+      --panel: #121820;
+      --panel-border: #1e2836;
+      --accent: #ef4444;
+      --accent-soft: rgba(239, 68, 68, 0.15);
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --green: #22c55e;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
+    html, body { height: 100%; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+    #map { position: absolute; inset: 0; }
+
+    /* Top bar */
+    .topbar {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+      display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+      padding: 0.75rem 1rem;
+      background: linear-gradient(180deg, rgba(11,15,20,0.95) 0%, rgba(11,15,20,0.7) 70%, transparent 100%);
+      pointer-events: none;
     }
-    header {
-      background: var(--panel);
-      border-bottom: 1px solid var(--border);
-      padding: 0.75rem 1.25rem;
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-      z-index: 1000;
+    .topbar > * { pointer-events: auto; }
+    .brand {
+      font-weight: 800; font-size: 1.05rem; letter-spacing: -0.02em;
+      color: var(--text); display: flex; align-items: center; gap: 0.4rem;
     }
-    header h1 {
-      font-size: 1.15rem;
-      font-weight: 700;
-      color: var(--accent);
-      white-space: nowrap;
+    .brand span { color: var(--accent); }
+    .search-wrap {
+      flex: 1; min-width: 200px; max-width: 420px; position: relative;
     }
-    .controls {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      align-items: center;
-      flex: 1;
+    .search-wrap input {
+      width: 100%; padding: 0.55rem 0.9rem 0.55rem 2.4rem;
+      background: var(--panel); border: 1px solid var(--panel-border);
+      border-radius: 10px; color: var(--text); font-size: 0.9rem;
+      outline: none;
     }
-    input[type="text"] {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 0.45rem 0.75rem;
-      border-radius: 6px;
-      min-width: 200px;
-      font-size: 0.9rem;
+    .search-wrap input:focus { border-color: var(--accent); }
+    .search-wrap::before {
+      content: "🔍"; position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%);
+      font-size: 0.85rem; opacity: 0.6; pointer-events: none;
     }
-    button, select {
-      background: var(--accent);
-      color: white;
-      border: none;
-      padding: 0.45rem 0.9rem;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      font-weight: 600;
+    .btn {
+      background: var(--panel); border: 1px solid var(--panel-border);
+      color: var(--text); padding: 0.5rem 0.85rem; border-radius: 10px;
+      font-size: 0.85rem; font-weight: 600; cursor: pointer;
     }
-    button.secondary { background: #2a3548; }
-    button:hover { filter: brightness(1.1); }
-    #map { flex: 1; width: 100%; z-index: 1; }
-    .info-panel {
-      position: absolute;
-      top: 70px;
-      right: 12px;
-      width: 340px;
-      max-height: calc(100vh - 100px);
+    .btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn.primary:hover { filter: brightness(1.1); }
+
+    /* Stats pill */
+    .stats {
+      position: absolute; top: 4.2rem; left: 1rem; z-index: 10;
+      background: var(--panel); border: 1px solid var(--panel-border);
+      border-radius: 12px; padding: 0.75rem 1rem; min-width: 160px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .stats .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+    .stats .value { font-size: 1.6rem; font-weight: 800; color: var(--accent); line-height: 1.2; }
+    .stats .sub { font-size: 0.75rem; color: var(--muted); margin-top: 0.15rem; }
+
+    /* Side panel */
+    .panel {
+      position: absolute; top: 4.2rem; right: 1rem; z-index: 10;
+      width: min(340px, calc(100vw - 2rem));
+      max-height: calc(100vh - 6rem);
       overflow-y: auto;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1rem;
-      z-index: 900;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.45);
-      font-size: 0.88rem;
-      line-height: 1.45;
+      background: var(--panel); border: 1px solid var(--panel-border);
+      border-radius: 14px; padding: 1.1rem;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+      font-size: 0.88rem; line-height: 1.5;
     }
-    .info-panel h2 { font-size: 1rem; margin-bottom: 0.6rem; color: var(--accent); }
-    .info-panel h3 { font-size: 0.92rem; margin: 0.9rem 0 0.35rem; color: #f0a500; }
-    .info-panel p, .info-panel ul { margin-bottom: 0.55rem; color: var(--muted); }
-    .info-panel ul { padding-left: 1.1rem; }
-    .info-panel a { color: #5dade2; }
-    .stats { display: flex; gap: 0.75rem; margin: 0.6rem 0; flex-wrap: wrap; }
-    .stat { background: var(--bg); padding: 0.35rem 0.6rem; border-radius: 5px; font-size: 0.8rem; }
-    .stat strong { color: var(--accent); }
-    .close-btn {
-      float: right;
-      background: transparent;
-      color: var(--muted);
-      font-size: 1.2rem;
-      padding: 0 0.3rem;
-      line-height: 1;
+    .panel.hidden { display: none; }
+    .panel h2 { font-size: 1rem; margin-bottom: 0.5rem; }
+    .panel h3 { font-size: 0.85rem; color: #fbbf24; margin: 0.85rem 0 0.35rem; }
+    .panel p, .panel li { color: var(--muted); margin-bottom: 0.4rem; }
+    .panel ul { padding-left: 1.1rem; }
+    .panel a { color: #60a5fa; }
+    .panel .close {
+      float: right; background: none; border: none; color: var(--muted);
+      font-size: 1.3rem; cursor: pointer; line-height: 1;
     }
-    .loading {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(15,20,25,0.92);
-      padding: 1rem 1.5rem;
-      border-radius: 8px;
-      z-index: 1000;
-      display: none;
-      text-align: center;
-      max-width: 280px;
+
+    /* Legend */
+    .legend {
+      position: absolute; bottom: 1.5rem; left: 1rem; z-index: 10;
+      background: var(--panel); border: 1px solid var(--panel-border);
+      border-radius: 10px; padding: 0.6rem 0.85rem; font-size: 0.75rem;
+      display: flex; gap: 0.75rem; align-items: center;
     }
-    .leaflet-popup-content { color: #222; font-size: 0.85rem; }
-    @media (max-width: 700px) {
-      .info-panel { width: calc(100% - 24px); right: 12px; left: 12px; max-height: 45vh; }
+    .legend .swatch {
+      width: 12px; height: 12px; border-radius: 50%; display: inline-block;
+    }
+    .legend .heat {
+      width: 48px; height: 10px; border-radius: 4px;
+      background: linear-gradient(90deg, #3b82f6, #eab308, #ef4444);
+    }
+
+    .maplibregl-popup-content {
+      background: #1e293b !important; color: #f1f5f9 !important;
+      border-radius: 10px !important; padding: 0.75rem 1rem !important;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
+      font-size: 0.85rem;
+    }
+    .maplibregl-popup-tip { border-top-color: #1e293b !important; }
+    .maplibregl-ctrl-attrib { font-size: 10px !important; }
+
+    @media (max-width: 640px) {
+      .stats { top: auto; bottom: 4.5rem; left: 0.75rem; }
+      .panel { top: auto; bottom: 4.5rem; right: 0.75rem; left: 0.75rem; width: auto; max-height: 40vh; }
+      .legend { bottom: 0.75rem; left: 0.75rem; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Flock & ALPR Tracker</h1>
-    <div class="controls">
-      <input type="text" id="search" placeholder="City, address, or ZIP..." />
-      <button onclick="geocodeSearch()">Search</button>
-      <select id="filter">
-        <option value="all">All ALPR</option>
-        <option value="flock" selected>Flock Safety only</option>
-      </select>
-      <button class="secondary" onclick="loadCameras(true)">Refresh View</button>
-      <button class="secondary" onclick="toggleInfo()">Info</button>
-    </div>
-  </header>
-
   <div id="map"></div>
-  <div class="loading" id="loading">
-    Loading cameras…<br>
-    <small id="loadStatus" style="color:#8b9bb4"></small>
+
+  <div class="topbar">
+    <div class="brand">Don&rsquo;t Get <span>Flocked</span></div>
+    <div class="search-wrap">
+      <input id="search" type="text" placeholder="Search city, address, or ZIP…" autocomplete="off" />
+    </div>
+    <button class="btn" id="btnLocate" title="My location">📍 Locate</button>
+    <button class="btn" id="btnInfo">Info</button>
   </div>
 
-  <div class="info-panel" id="infoPanel">
-    <button class="close-btn" onclick="toggleInfo()">×</button>
-    <h2>What Flock Cameras Do</h2>
-    <p><strong>Flock Safety</strong> makes automated license plate readers (ALPRs). They continuously photograph vehicles and turn the images into searchable data.</p>
+  <div class="stats" id="stats">
+    <div class="label">Cameras in view</div>
+    <div class="value" id="count">—</div>
+    <div class="sub" id="zoomHint">Zoom or pan to explore</div>
+  </div>
+
+  <div class="panel" id="infoPanel">
+    <button class="close" id="btnCloseInfo">×</button>
+    <h2>What are these cameras?</h2>
+    <p>
+      This map shows <strong>automated license plate readers (ALPRs)</strong> — mostly Flock Safety devices —
+      sourced from the same OpenStreetMap / DeFlock data used by FlockHopper.
+    </p>
     <h3>What they capture</h3>
     <ul>
       <li>License plate number</li>
       <li>Make, model, color, body type</li>
-      <li>Distinctive features (stickers, racks, damage…)</li>
-      <li>Exact time + location of the pass</li>
+      <li>Distinctive features (stickers, racks, damage)</li>
+      <li>Exact time and location of every pass</li>
     </ul>
-    <p>No facial recognition — focus is on the vehicle.</p>
+    <p>No facial recognition. Focus is on the vehicle.</p>
     <h3>How the network works</h3>
     <ul>
-      <li>Used by police, HOAs, businesses, schools</li>
-      <li>Default retention ≈ 30 days (agencies can set longer)</li>
-      <li>Agencies can search each other’s data + receive hotlist alerts</li>
+      <li>Installed by police, HOAs, businesses, and schools</li>
+      <li>Default retention ~30 days (agencies can extend)</li>
+      <li>Many agencies share data nationwide</li>
       <li>Flock claims 120k+ cameras across 49 states</li>
     </ul>
     <h3>About this map</h3>
-    <p>Locations come from the open OpenStreetMap database (same source used by DeFlock). Coverage is incomplete and volunteer-maintained.</p>
-    <div class="stats">
-      <div class="stat">Cameras in view: <strong id="count">—</strong></div>
-    </div>
-    <p style="margin-top:1rem;font-size:0.8rem;">
-      Data: OpenStreetMap via Overpass mirrors<br>
-      Tiles: OpenStreetMap / Carto<br>
-      Not affiliated with Flock Safety.
+    <p>
+      Camera locations come from community-mapped OpenStreetMap nodes
+      (<code>surveillance:type=ALPR</code>), served as vector tiles by the
+      <a href="https://dontgetflocked.com" target="_blank" rel="noopener">FlockHopper / dontgetflocked</a> pipeline.
+      Coverage is incomplete and volunteer-maintained.
+    </p>
+    <p style="margin-top:0.75rem;font-size:0.75rem;color:var(--muted);">
+      Not affiliated with Flock Safety or dontgetflocked.com.<br>
+      Tiles © community data via tiles.dontgetflocked.com · Map © OpenStreetMap / CARTO
     </p>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <div class="legend">
+    <span class="heat" title="Density heatmap"></span>
+    <span>Density</span>
+    <span class="swatch" style="background:#ef4444"></span>
+    <span>Camera</span>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script>
-    // ========== RELIABLE OVERPASS ENDPOINTS (fallbacks) ==========
-    const OVERPASS_ENDPOINTS = [
-      'https://overpass.kumi.systems/api/interpreter',
-      'https://overpass.private.coffee/api/interpreter',
-      'https://z.overpass-api.de/api/interpreter',
-      'https://overpass-api.de/api/interpreter',
-      'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
-    ];
+    // Public vector tiles from the FlockHopper / dontgetflocked pipeline
+    // (CORS-enabled, no API key required)
+    const TILE_URL = 'https://tiles.dontgetflocked.com/cameras-us-hourly.json';
 
-    const map = L.map('map', {
-      center: [39.8283, -98.5795],
-      zoom: 5,
-      zoomControl: true
-    });
-
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
-      maxZoom: 19
-    }).addTo(map);
-
-    const markers = L.markerClusterGroup({
-      maxClusterRadius: 50,
-      spiderfyOnMaxZoom: true,
-      showCoverageOnHover: false
-    });
-    map.addLayer(markers);
-
-    let loading = false;
-    let lastEndpointIndex = 0;
-
-    async function fetchWithFallback(query) {
-      const body = 'data=' + encodeURIComponent(query);
-      const errors = [];
-
-      // Try endpoints starting from last successful one
-      for (let i = 0; i < OVERPASS_ENDPOINTS.length; i++) {
-        const idx = (lastEndpointIndex + i) % OVERPASS_ENDPOINTS.length;
-        const url = OVERPASS_ENDPOINTS[idx];
-        document.getElementById('loadStatus').textContent = `Trying ${new URL(url).hostname}…`;
-
-        try {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 35000);
-
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'User-Agent': 'FlockCameraMap/1.0 (educational; contact: local-user)'
-            },
-            body,
-            signal: controller.signal,
-            mode: 'cors'
-          });
-
-          clearTimeout(timeout);
-
-          if (!response.ok) {
-            errors.push(`${url}: HTTP ${response.status}`);
-            continue;
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: {
+        version: 8,
+        sources: {
+          carto: {
+            type: 'raster',
+            tiles: [
+              'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+              'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+              'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'
+            ],
+            tileSize: 256,
+            attribution: '© OpenStreetMap © CARTO'
+          },
+          cameras: {
+            type: 'vector',
+            url: TILE_URL
           }
-
-          const data = await response.json();
-          lastEndpointIndex = idx; // remember good one
-          return data;
-        } catch (err) {
-          errors.push(`${url}: ${err.name === 'AbortError' ? 'timeout' : err.message}`);
-        }
-      }
-
-      throw new Error('All Overpass mirrors failed:\n' + errors.join('\n'));
-    }
-
-    async function loadCameras(force = false) {
-      if (loading) return;
-      if (!force && map.getZoom() < 9) {
-        document.getElementById('count').textContent = 'Zoom in (≥9) to load';
-        return;
-      }
-
-      loading = true;
-      document.getElementById('loading').style.display = 'block';
-      document.getElementById('loadStatus').textContent = '';
-      markers.clearLayers();
-
-      const bounds = map.getBounds();
-      const south = bounds.getSouth().toFixed(5);
-      const west  = bounds.getWest().toFixed(5);
-      const north = bounds.getNorth().toFixed(5);
-      const east  = bounds.getEast().toFixed(5);
-
-      // Keep query modest — large bboxes often timeout
-      const query = `
-[out:json][timeout:25];
-(
-  node["surveillance:type"="ALPR"](${south},${west},${north},${east});
-);
-out body;
-`;
-
-      try {
-        const data = await fetchWithFallback(query);
-        const filter = document.getElementById('filter').value;
-        let count = 0;
-
-        (data.elements || []).forEach(el => {
-          if (el.type !== 'node' || !el.lat || !el.lon) return;
-
-          const tags = el.tags || {};
-          const manufacturer = (tags.manufacturer || tags.brand || '').toLowerCase();
-          const isFlock = manufacturer.includes('flock');
-
-          if (filter === 'flock' && !isFlock) return;
-
-          count++;
-          const popup = `
-            <strong>${isFlock ? 'Flock Safety' : (tags.manufacturer || 'ALPR Camera')}</strong><br>
-            ${tags.operator ? 'Operator: ' + tags.operator + '<br>' : ''}
-            ${tags['camera:direction'] || tags.direction ? 'Direction: ' + (tags['camera:direction'] || tags.direction) + '<br>' : ''}
-            ${tags.description ? tags.description + '<br>' : ''}
-            OSM: <a href="https://www.openstreetmap.org/node/${el.id}" target="_blank" rel="noopener">${el.id}</a>
-          `;
-
-          const icon = L.divIcon({
-            className: '',
-            html: `<div style="
-              background:${isFlock ? '#e74c3c' : '#3498db'};
-              width:12px;height:12px;border-radius:50%;
-              border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.6);
-            "></div>`,
-            iconSize: [12, 12],
-            iconAnchor: [6, 6]
-          });
-
-          L.marker([el.lat, el.lon], { icon })
-            .bindPopup(popup)
-            .addTo(markers);
-        });
-
-        document.getElementById('count').textContent = count.toLocaleString();
-      } catch (err) {
-        console.error(err);
-        document.getElementById('count').textContent = 'Error';
-        alert('Could not load cameras.\n\n' +
-              'Common fixes:\n' +
-              '• Serve the page with a local server (python -m http.server)\n' +
-              '• Zoom in closer (smaller area)\n' +
-              '• Wait 30–60 s and try Refresh\n\n' +
-              err.message);
-      } finally {
-        loading = false;
-        document.getElementById('loading').style.display = 'none';
-      }
-    }
-
-    async function geocodeSearch() {
-      const q = document.getElementById('search').value.trim();
-      if (!q) return;
-
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=us&limit=1`,
+        },
+        layers: [
           {
-            headers: {
-              'User-Agent': 'FlockCameraMap/1.0 (educational local tool)',
-              'Accept-Language': 'en'
+            id: 'basemap',
+            type: 'raster',
+            source: 'carto'
+          },
+          // Heatmap at low zoom (national / regional density)
+          {
+            id: 'cameras-heat',
+            type: 'heatmap',
+            source: 'cameras',
+            'source-layer': 'cameras',
+            maxzoom: 11,
+            paint: {
+              'heatmap-weight': 1,
+              'heatmap-intensity': [
+                'interpolate', ['linear'], ['zoom'],
+                0, 0.6,
+                9, 1.4
+              ],
+              'heatmap-color': [
+                'interpolate', ['linear'], ['heatmap-density'],
+                0, 'rgba(0,0,0,0)',
+                0.15, 'rgba(59,130,246,0.5)',
+                0.4, 'rgba(34,197,94,0.6)',
+                0.65, 'rgba(234,179,8,0.75)',
+                0.85, 'rgba(249,115,22,0.85)',
+                1, 'rgba(239,68,68,0.95)'
+              ],
+              'heatmap-radius': [
+                'interpolate', ['linear'], ['zoom'],
+                0, 2,
+                5, 8,
+                9, 18
+              ],
+              'heatmap-opacity': [
+                'interpolate', ['linear'], ['zoom'],
+                9, 1,
+                11, 0
+              ]
+            }
+          },
+          // Individual camera dots at higher zoom
+          {
+            id: 'cameras-points',
+            type: 'circle',
+            source: 'cameras',
+            'source-layer': 'cameras',
+            minzoom: 9,
+            paint: {
+              'circle-radius': [
+                'interpolate', ['linear'], ['zoom'],
+                9, 3,
+                12, 5,
+                14, 7
+              ],
+              'circle-color': [
+                'case',
+                ['in', 'flock', ['downcase', ['coalesce', ['get', 'brand'], '']]], '#ef4444',
+                ['in', 'flock', ['downcase', ['coalesce', ['get', 'manufacturer'], '']]], '#ef4444',
+                '#3b82f6'
+              ],
+              'circle-stroke-width': 1.5,
+              'circle-stroke-color': '#ffffff',
+              'circle-opacity': [
+                'interpolate', ['linear'], ['zoom'],
+                9, 0.4,
+                11, 1
+              ]
             }
           }
-        );
-        if (!res.ok) throw new Error('Nominatim ' + res.status);
-        const results = await res.json();
-        if (!results.length) {
-          alert('Location not found');
-          return;
+        ]
+      },
+      center: [-98.5795, 39.8283],
+      zoom: 4,
+      maxZoom: 16,
+      attributionControl: true
+    });
+
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+    map.addControl(new maplibregl.ScaleControl({ maxWidth: 100 }), 'bottom-left');
+
+    // Approximate camera count in current viewport (sampled from rendered features)
+    function updateCount() {
+      if (!map.getLayer('cameras-points') && !map.getLayer('cameras-heat')) return;
+      const zoom = map.getZoom();
+      const bounds = map.getBounds();
+      let features = [];
+      try {
+        // Prefer point layer when visible
+        if (zoom >= 9) {
+          features = map.queryRenderedFeatures({
+            layers: ['cameras-points']
+          });
+        } else {
+          features = map.queryRenderedFeatures({
+            layers: ['cameras-heat']
+          });
         }
-        const { lat, lon } = results[0];
-        map.setView([parseFloat(lat), parseFloat(lon)], 13);
-        setTimeout(() => loadCameras(true), 500);
-      } catch (e) {
-        console.error(e);
-        alert('Search failed (Nominatim). Try again in a few seconds or type a clearer place name.');
+      } catch (e) {}
+
+      // Deduplicate by geometry (MVT can repeat features across tiles)
+      const seen = new Set();
+      let count = 0;
+      for (const f of features) {
+        const key = f.geometry && f.geometry.coordinates
+          ? f.geometry.coordinates.join(',')
+          : JSON.stringify(f.properties);
+        if (!seen.has(key)) {
+          seen.add(key);
+          count++;
+        }
+      }
+
+      const el = document.getElementById('count');
+      const hint = document.getElementById('zoomHint');
+      if (zoom < 5) {
+        el.textContent = 'Zoom in'; density';
+        hint.textContent = 'Heatmap shows regional concentration';
+      } else if (zoom < 9) {
+        el.textContent = count > 0 ? '~' + count.toLocaleString() : '—';
+        hint.textContent = 'Heatmap view · zoom closer for dots';
+      } else {
+        el.textContent = count.toLocaleString();
+        hint.textContent = 'Individual cameras';
       }
     }
 
-    document.getElementById('search').addEventListener('keydown', e => {
-      if (e.key === 'Enter') geocodeSearch();
-    });
-    document.getElementById('filter').addEventListener('change', () => loadCameras(true));
-
-    let moveTimeout;
-    map.on('moveend', () => {
-      clearTimeout(moveTimeout);
-      moveTimeout = setTimeout(() => {
-        if (map.getZoom() >= 9) loadCameras();
-      }, 700);
+    map.on('load', () => {
+      updateCount();
+      map.on('moveend', updateCount);
+      map.on('zoomend', updateCount);
     });
 
-    function toggleInfo() {
-      const panel = document.getElementById('infoPanel');
-      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    // Click a camera for details
+    map.on('click', 'cameras-points', (e) => {
+      const f = e.features[0];
+      if (!f) return;
+      const p = f.properties || {};
+      const brand = p.brand || p.manufacturer || 'ALPR Camera';
+      const isFlock = /flock/i.test(brand);
+      const dir = p.directionCardinal || p.direction || '';
+      const operator = p.operator || '';
+
+      const html = `
+        <strong style="color:${isFlock ? '#ef4444' : '#60a5fa'}">${brand}</strong><br>
+        ${operator ? 'Operator: ' + operator + '<br>' : ''}
+        ${dir ? 'Direction: ' + dir + '<br>' : ''}
+        ${p.description ? p.description + '<br>' : ''}
+      `;
+
+      new maplibregl.Popup({ closeButton: true, maxWidth: '260px' })
+        .setLngLat(e.lngLat)
+        .setHTML(html)
+        .addTo(map);
+    });
+
+    map.on('mouseenter', 'cameras-points', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'cameras-points', () => { map.getCanvas().style.cursor = ''; });
+
+    // Search (Nominatim)
+    async function geocode(q) {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=us&limit=1`;
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'FlockCameraMap/2.0 (educational)', 'Accept-Language': 'en' }
+      });
+      if (!res.ok) throw new Error('Search failed');
+      const data = await res.json();
+      return data[0] || null;
     }
 
-    // Initial message
-    setTimeout(() => {
-      if (map.getZoom() < 9) {
-        document.getElementById('count').textContent = 'Zoom in to load cameras';
+    document.getElementById('search').addEventListener('keydown', async (e) => {
+      if (e.key !== 'Enter') return;
+      const q = e.target.value.trim();
+      if (!q) return;
+      try {
+        const hit = await geocode(q);
+        if (!hit) { alert('Location not found'); return; }
+        map.flyTo({
+          center: [parseFloat(hit.lon), parseFloat(hit.lat)],
+          zoom: 12,
+          essential: true
+        });
+      } catch (err) {
+        alert('Search failed. Try again in a moment.');
       }
-    }, 800);
+    });
+
+    document.getElementById('btnLocate').addEventListener('click', () => {
+      if (!navigator.geolocation) {
+        alert('Geolocation not supported');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          map.flyTo({
+            center: [pos.coords.longitude, pos.coords.latitude],
+            zoom: 13,
+            essential: true
+          });
+        },
+        () => alert('Could not get your location')
+      );
+    });
+
+    const panel = document.getElementById('infoPanel');
+    document.getElementById('btnInfo').addEventListener('click', () => panel.classList.toggle('hidden'));
+    document.getElementById('btnCloseInfo').addEventListener('click', () => panel.classList.add('hidden'));
   </script>
 </body>
 </html>
