@@ -2,216 +2,136 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="referrer" content="strict-origin-when-cross-origin" />
-  <title>ALPR Camera Map | Flock Surveillance Tracker</title>
-  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>ALPR Camera Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
   <style>
-    :root {
-      --bg: #0b0f14;
-      --panel: #121820;
-      --panel-border: #1e2836;
-      --accent: #ef4444;
-      --accent-soft: rgba(239, 68, 68, 0.15);
-      --text: #f1f5f9;
-      --muted: #94a3b8;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-    }
-    #map {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      z-index: 0;
-    }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0b0f14; font-family: system-ui, sans-serif; color: #f1f5f9; }
+    #map { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-    .topbar {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 10;
-      display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
-      padding: 0.75rem 1rem;
-      background: linear-gradient(180deg, rgba(11,15,20,0.95) 0%, rgba(11,15,20,0.7) 70%, transparent 100%);
+    .bar {
+      position: absolute; z-index: 2; top: 12px; left: 12px; right: 12px;
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
       pointer-events: none;
     }
-    .topbar > * { pointer-events: auto; }
-    .brand {
-      font-weight: 800; font-size: 1.05rem; letter-spacing: -0.02em;
-      color: var(--text);
+    .bar > * { pointer-events: auto; }
+    .logo { font-weight: 800; font-size: 15px; text-shadow: 0 1px 4px #000; }
+    .logo b { color: #ef4444; }
+    input, button {
+      border: 1px solid #334155; background: #0f172a; color: #e2e8f0;
+      border-radius: 8px; padding: 8px 12px; font-size: 14px;
     }
-    .brand span { color: var(--accent); }
-    .search-wrap {
-      flex: 1; min-width: 180px; max-width: 420px; position: relative;
-    }
-    .search-wrap input {
-      width: 100%; padding: 0.55rem 0.9rem;
-      background: var(--panel); border: 1px solid var(--panel-border);
-      border-radius: 10px; color: var(--text); font-size: 0.9rem;
-      outline: none;
-    }
-    .search-wrap input:focus { border-color: var(--accent); }
-    .btn {
-      background: var(--panel); border: 1px solid var(--panel-border);
-      color: var(--text); padding: 0.5rem 0.85rem; border-radius: 10px;
-      font-size: 0.85rem; font-weight: 600; cursor: pointer;
-    }
-    .btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+    input { flex: 1; min-width: 160px; max-width: 320px; }
+    input:focus { outline: 1px solid #ef4444; }
+    button { cursor: pointer; font-weight: 600; }
+    button:hover { border-color: #ef4444; }
 
-    .stats {
-      position: fixed; top: 4.2rem; left: 1rem; z-index: 10;
-      background: var(--panel); border: 1px solid var(--panel-border);
-      border-radius: 12px; padding: 0.75rem 1rem; min-width: 160px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    .card {
+      position: absolute; z-index: 2; left: 12px; top: 58px;
+      background: rgba(15, 23, 42, 0.92); border: 1px solid #334155;
+      border-radius: 12px; padding: 10px 14px; min-width: 140px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.45);
     }
-    .stats .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-    .stats .value { font-size: 1.6rem; font-weight: 800; color: var(--accent); line-height: 1.2; }
-    .stats .sub { font-size: 0.75rem; color: var(--muted); margin-top: 0.15rem; }
+    .card .k { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; }
+    .card .v { font-size: 22px; font-weight: 800; color: #ef4444; }
+    .card .s { font-size: 12px; color: #94a3b8; margin-top: 2px; }
 
-    .panel {
-      position: fixed; top: 4.2rem; right: 1rem; z-index: 10;
-      width: min(340px, calc(100vw - 2rem));
-      max-height: calc(100vh - 6rem);
-      overflow-y: auto;
-      background: var(--panel); border: 1px solid var(--panel-border);
-      border-radius: 14px; padding: 1.1rem;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
-      font-size: 0.88rem; line-height: 1.5;
+    .info {
+      position: absolute; z-index: 2; right: 12px; top: 58px; width: min(320px, calc(100vw - 24px));
+      max-height: calc(100vh - 80px); overflow: auto;
+      background: rgba(15, 23, 42, 0.95); border: 1px solid #334155;
+      border-radius: 12px; padding: 14px; font-size: 13px; line-height: 1.45;
+      box-shadow: 0 8px 24px rgba(0,0,0,.45);
     }
-    .panel.hidden { display: none; }
-    .panel h2 { font-size: 1rem; margin-bottom: 0.5rem; }
-    .panel h3 { font-size: 0.85rem; color: #fbbf24; margin: 0.85rem 0 0.35rem; }
-    .panel p, .panel li { color: var(--muted); margin-bottom: 0.4rem; }
-    .panel ul { padding-left: 1.1rem; }
-    .panel a { color: #60a5fa; }
-    .panel .close {
-      float: right; background: none; border: none; color: var(--muted);
-      font-size: 1.3rem; cursor: pointer; line-height: 1;
-    }
+    .info.hidden { display: none; }
+    .info h2 { margin: 0 0 8px; font-size: 15px; }
+    .info h3 { margin: 12px 0 4px; font-size: 13px; color: #fbbf24; }
+    .info p, .info li { color: #94a3b8; margin: 0 0 6px; }
+    .info ul { padding-left: 18px; margin: 0; }
+    .info a { color: #60a5fa; }
+    .info .x { float: right; background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; line-height: 1; padding: 0; }
 
     .legend {
-      position: fixed; bottom: 1.5rem; left: 1rem; z-index: 10;
-      background: var(--panel); border: 1px solid var(--panel-border);
-      border-radius: 10px; padding: 0.6rem 0.85rem; font-size: 0.75rem;
-      display: flex; gap: 0.75rem; align-items: center;
+      position: absolute; z-index: 2; left: 12px; bottom: 28px;
+      background: rgba(15, 23, 42, 0.9); border: 1px solid #334155;
+      border-radius: 8px; padding: 6px 10px; font-size: 12px;
+      display: flex; gap: 10px; align-items: center;
     }
-    .legend .swatch { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
-    .legend .heat {
-      width: 48px; height: 10px; border-radius: 4px;
-      background: linear-gradient(90deg, #3b82f6, #eab308, #ef4444);
-    }
+    .grad { width: 48px; height: 8px; border-radius: 4px; background: linear-gradient(90deg,#3b82f6,#eab308,#ef4444); }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; display: inline-block; }
 
-    #errorBanner {
-      display: none;
-      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      z-index: 20; background: #7f1d1d; color: #fecaca; padding: 1rem 1.25rem;
-      border-radius: 12px; max-width: 90vw; text-align: center; font-size: 0.9rem;
-    }
-
-    .maplibregl-popup-content {
-      background: #1e293b !important; color: #f1f5f9 !important;
-      border-radius: 10px !important; padding: 0.75rem 1rem !important;
-      font-size: 0.85rem;
-    }
-    .maplibregl-popup-tip { border-top-color: #1e293b !important; }
-
-    @media (max-width: 640px) {
-      .stats { top: auto; bottom: 4.5rem; left: 0.75rem; }
-      .panel { top: auto; bottom: 4.5rem; right: 0.75rem; left: 0.75rem; width: auto; max-height: 40vh; }
-      .legend { bottom: 0.75rem; left: 0.75rem; }
+    #err {
+      display: none; position: absolute; z-index: 5; left: 50%; top: 50%;
+      transform: translate(-50%,-50%); background: #7f1d1d; color: #fecaca;
+      padding: 14px 18px; border-radius: 12px; max-width: 90vw; text-align: center;
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
-  <div id="errorBanner"></div>
+  <div id="err"></div>
 
-  <div class="topbar">
-    <div class="brand">Don&rsquo;t Get <span>Flocked</span></div>
-    <div class="search-wrap">
-      <input id="search" type="text" placeholder="Search city, address, or ZIP…" autocomplete="off" />
-    </div>
-    <button class="btn" id="btnLocate" type="button">Locate</button>
-    <button class="btn" id="btnInfo" type="button">Info</button>
+  <div class="bar">
+    <div class="logo">Don&rsquo;t Get <b>Flocked</b></div>
+    <input id="q" type="search" placeholder="City, address, or ZIP" />
+    <button type="button" id="locate">Locate</button>
+    <button type="button" id="toggleInfo">Info</button>
   </div>
 
-  <div class="stats" id="stats">
-    <div class="label">Cameras in view</div>
-    <div class="value" id="count">—</div>
-    <div class="sub" id="zoomHint">Loading map…</div>
+  <div class="card">
+    <div class="k">In view</div>
+    <div class="v" id="count">—</div>
+    <div class="s" id="hint">Loading…</div>
   </div>
 
-  <div class="panel" id="infoPanel">
-    <button class="close" id="btnCloseInfo" type="button">×</button>
-    <h2>What are these cameras?</h2>
-    <p>
-      This map shows <strong>automated license plate readers (ALPRs)</strong> — mostly Flock Safety devices —
-      sourced from the same OpenStreetMap / DeFlock data used by FlockHopper.
-    </p>
+  <div class="info" id="info">
+    <button class="x" type="button" id="closeInfo">×</button>
+    <h2>ALPR cameras</h2>
+    <p>Automated license plate readers (mostly Flock Safety) mapped from OpenStreetMap / DeFlock community data.</p>
     <h3>What they capture</h3>
     <ul>
-      <li>License plate number</li>
-      <li>Make, model, color, body type</li>
-      <li>Distinctive features (stickers, racks, damage)</li>
-      <li>Exact time and location of every pass</li>
+      <li>Plate, make, model, color</li>
+      <li>Time and exact location</li>
+      <li>Vehicle features (stickers, damage)</li>
     </ul>
-    <p>No facial recognition. Focus is on the vehicle.</p>
-    <h3>How the network works</h3>
+    <h3>Network</h3>
     <ul>
-      <li>Installed by police, HOAs, businesses, and schools</li>
-      <li>Default retention ~30 days (agencies can extend)</li>
-      <li>Many agencies share data nationwide</li>
-      <li>Flock claims 120k+ cameras across 49 states</li>
+      <li>~30-day default retention</li>
+      <li>Many agencies share data nationally</li>
+      <li>100k+ cameras claimed by Flock</li>
     </ul>
-    <h3>About this map</h3>
-    <p>
-      Camera locations come from community-mapped OpenStreetMap nodes,
-      served as vector tiles by
-      <a href="https://dontgetflocked.com" target="_blank" rel="noopener">tiles.dontgetflocked.com</a>.
-      Coverage is incomplete and volunteer-maintained.
-    </p>
-    <p style="margin-top:0.75rem;font-size:0.75rem;color:var(--muted);">
-      Not affiliated with Flock Safety or dontgetflocked.com.<br>
-      Map © OpenStreetMap / CARTO
+    <p style="margin-top:10px;font-size:11px">
+      Data via <a href="https://dontgetflocked.com" target="_blank" rel="noopener">tiles.dontgetflocked.com</a>.
+      Not affiliated. Coverage is incomplete.
     </p>
   </div>
 
   <div class="legend">
-    <span class="heat"></span>
-    <span>Density</span>
-    <span class="swatch" style="background:#ef4444"></span>
-    <span>Camera</span>
+    <span class="grad"></span> Density
+    <span class="dot"></span> Camera
   </div>
 
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script>
     (function () {
-      const banner = document.getElementById('errorBanner');
-      function showError(msg) {
-        banner.style.display = 'block';
-        banner.textContent = msg;
-        document.getElementById('zoomHint').textContent = 'Map error';
+      var errEl = document.getElementById('err');
+      function fail(msg) {
+        errEl.style.display = 'block';
+        errEl.textContent = msg;
+        document.getElementById('hint').textContent = 'Error';
       }
 
       if (typeof maplibregl === 'undefined') {
-        showError('Failed to load MapLibre from CDN. Check network / ad blockers.');
+        fail('Could not load MapLibre. Disable blockers or try again.');
         return;
       }
 
-      const map = new maplibregl.Map({
+      var map = new maplibregl.Map({
         container: 'map',
         style: {
           version: 8,
           sources: {
-            carto: {
+            basemap: {
               type: 'raster',
               tiles: [
                 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
@@ -223,221 +143,134 @@
             },
             cameras: {
               type: 'vector',
-              tiles: [
-                'https://tiles.dontgetflocked.com/cameras-us-hourly/{z}/{x}/{y}.mvt'
-              ],
+              tiles: ['https://tiles.dontgetflocked.com/cameras-us-hourly/{z}/{x}/{y}.mvt'],
               minzoom: 0,
               maxzoom: 14
             }
           },
           layers: [
+            { id: 'basemap', type: 'raster', source: 'basemap' },
             {
-              id: 'basemap',
-              type: 'raster',
-              source: 'carto'
-            },
-            {
-              id: 'cameras-heat',
+              id: 'heat',
               type: 'heatmap',
               source: 'cameras',
               'source-layer': 'cameras',
-              maxzoom: 11,
+              maxzoom: 12,
               paint: {
                 'heatmap-weight': 1,
-                'heatmap-intensity': [
-                  'interpolate', ['linear'], ['zoom'],
-                  0, 0.6,
-                  9, 1.4
-                ],
+                'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 0.5, 10, 1.5],
+                'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 2, 10, 20],
+                'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 10, 1, 12, 0],
                 'heatmap-color': [
                   'interpolate', ['linear'], ['heatmap-density'],
                   0, 'rgba(0,0,0,0)',
-                  0.15, 'rgba(59,130,246,0.55)',
-                  0.4, 'rgba(34,197,94,0.65)',
-                  0.65, 'rgba(234,179,8,0.8)',
-                  0.85, 'rgba(249,115,22,0.9)',
-                  1, 'rgba(239,68,68,0.95)'
-                ],
-                'heatmap-radius': [
-                  'interpolate', ['linear'], ['zoom'],
-                  0, 2,
-                  5, 8,
-                  9, 18
-                ],
-                'heatmap-opacity': [
-                  'interpolate', ['linear'], ['zoom'],
-                  9, 1,
-                  11, 0
+                  0.2, 'rgba(59,130,246,0.6)',
+                  0.5, 'rgba(234,179,8,0.75)',
+                  0.8, 'rgba(249,115,22,0.9)',
+                  1, 'rgba(239,68,68,1)'
                 ]
               }
             },
             {
-              id: 'cameras-points',
+              id: 'points',
               type: 'circle',
               source: 'cameras',
               'source-layer': 'cameras',
-              minzoom: 9,
+              minzoom: 10,
               paint: {
-                'circle-radius': [
-                  'interpolate', ['linear'], ['zoom'],
-                  9, 3,
-                  12, 5,
-                  14, 7
-                ],
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 7],
                 'circle-color': '#ef4444',
-                'circle-stroke-width': 1.5,
-                'circle-stroke-color': '#ffffff',
-                'circle-opacity': [
-                  'interpolate', ['linear'], ['zoom'],
-                  9, 0.5,
-                  11, 1
-                ]
+                'circle-stroke-color': '#fff',
+                'circle-stroke-width': 1.25,
+                'circle-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.4, 12, 1]
               }
             }
           ]
         },
-        center: [-98.5795, 39.8283],
+        center: [-98.58, 39.83],
         zoom: 4,
         maxZoom: 16
       });
 
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
-      map.addControl(new maplibregl.ScaleControl({ maxWidth: 100 }), 'bottom-left');
 
       map.on('error', function (e) {
-        console.error('MapLibre error', e);
-        if (e && e.error) {
-          showError('Map error: ' + (e.error.message || String(e.error)));
+        console.error(e);
+        if (e && e.error && e.error.message) {
+          // Don't spam banner for individual missing tiles
+          if (String(e.error.message).indexOf('Failed to fetch') !== -1) return;
         }
       });
 
       function updateCount() {
-        const zoom = map.getZoom();
-        let features = [];
+        var z = map.getZoom();
+        var feats = [];
         try {
-          if (zoom >= 9) {
-            features = map.queryRenderedFeatures({ layers: ['cameras-points'] });
-          } else {
-            features = map.queryRenderedFeatures({ layers: ['cameras-heat'] });
-          }
-        } catch (err) {}
-
-        const seen = new Set();
-        let count = 0;
-        for (let i = 0; i < features.length; i++) {
-          const f = features[i];
-          const key = (f.geometry && f.geometry.coordinates)
-            ? f.geometry.coordinates.join(',')
-            : String(i);
-          if (!seen.has(key)) {
-            seen.add(key);
-            count++;
-          }
+          feats = map.queryRenderedFeatures({
+            layers: z >= 10 ? ['points'] : ['heat']
+          });
+        } catch (e) {}
+        var seen = {};
+        var n = 0;
+        for (var i = 0; i < feats.length; i++) {
+          var c = feats[i].geometry && feats[i].geometry.coordinates;
+          var k = c ? c[0] + ',' + c[1] : i;
+          if (!seen[k]) { seen[k] = 1; n++; }
         }
-
-        const el = document.getElementById('count');
-        const hint = document.getElementById('zoomHint');
-        if (zoom < 5) {
-          el.textContent = 'Zoom in'; density';
-          hint.textContent = 'Heatmap shows regional concentration';
-        } else if (zoom < 9) {
-          el.textContent = count > 0 ? '~' + count.toLocaleString() : '—';
-          hint.textContent = 'Heatmap view · zoom closer for dots';
-        } else {
-          el.textContent = count.toLocaleString();
-          hint.textContent = 'Individual cameras';
-        }
+        document.getElementById('count').textContent = n ? n.toLocaleString() : (z < 5 ? 'Zoom in' : '—');
+        document.getElementById('hint').textContent =
+          z < 10 ? 'Heatmap · zoom for dots' : 'Individual cameras';
       }
 
       map.on('load', function () {
         map.resize();
         updateCount();
-        document.getElementById('zoomHint').textContent = 'Zoom or pan to explore';
         map.on('moveend', updateCount);
         map.on('zoomend', updateCount);
+        document.getElementById('hint').textContent = 'Zoom or pan';
       });
 
-      window.addEventListener('resize', function () {
-        map.resize();
-      });
+      window.addEventListener('resize', function () { map.resize(); });
 
-      map.on('click', 'cameras-points', function (e) {
-        const f = e.features && e.features[0];
+      map.on('click', 'points', function (e) {
+        var f = e.features && e.features[0];
         if (!f) return;
-        const p = f.properties || {};
-        const brand = p.brand || p.manufacturer || 'ALPR Camera';
-        const dir = p.directionCardinal || p.direction || '';
-        const operator = p.operator || '';
-        const html =
-          '<strong style="color:#ef4444">' + brand + '</strong><br>' +
-          (operator ? 'Operator: ' + operator + '<br>' : '') +
-          (dir ? 'Direction: ' + dir + '<br>' : '') +
-          (p.description ? p.description + '<br>' : '');
-
-        new maplibregl.Popup({ closeButton: true, maxWidth: '260px' })
-          .setLngLat(e.lngLat)
-          .setHTML(html)
-          .addTo(map);
+        var p = f.properties || {};
+        var name = p.brand || p.manufacturer || 'ALPR camera';
+        var html = '<strong style="color:#ef4444">' + name + '</strong>';
+        if (p.operator) html += '<br>Operator: ' + p.operator;
+        if (p.directionCardinal || p.direction) html += '<br>Dir: ' + (p.directionCardinal || p.direction);
+        new maplibregl.Popup().setLngLat(e.lngLat).setHTML(html).addTo(map);
       });
+      map.on('mouseenter', 'points', function () { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'points', function () { map.getCanvas().style.cursor = ''; });
 
-      map.on('mouseenter', 'cameras-points', function () {
-        map.getCanvas().style.cursor = 'pointer';
-      });
-      map.on('mouseleave', 'cameras-points', function () {
-        map.getCanvas().style.cursor = '';
-      });
-
-      document.getElementById('search').addEventListener('keydown', function (e) {
+      document.getElementById('q').addEventListener('keydown', function (e) {
         if (e.key !== 'Enter') return;
-        const q = e.target.value.trim();
+        var q = e.target.value.trim();
         if (!q) return;
-        fetch(
-          'https://nominatim.openstreetmap.org/search?format=json&q=' +
-            encodeURIComponent(q) + '&countrycodes=us&limit=1',
-          { headers: { 'Accept-Language': 'en' } }
-        )
-          .then(function (res) { return res.json(); })
+        fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=' + encodeURIComponent(q))
+          .then(function (r) { return r.json(); })
           .then(function (data) {
-            if (!data || !data.length) {
-              alert('Location not found');
-              return;
-            }
-            map.flyTo({
-              center: [parseFloat(data[0].lon), parseFloat(data[0].lat)],
-              zoom: 12,
-              essential: true
-            });
+            if (!data || !data[0]) { alert('Not found'); return; }
+            map.flyTo({ center: [+data[0].lon, +data[0].lat], zoom: 12 });
           })
-          .catch(function () {
-            alert('Search failed. Try again in a moment.');
-          });
+          .catch(function () { alert('Search failed'); });
       });
 
-      document.getElementById('btnLocate').addEventListener('click', function () {
-        if (!navigator.geolocation) {
-          alert('Geolocation not supported');
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(
-          function (pos) {
-            map.flyTo({
-              center: [pos.coords.longitude, pos.coords.latitude],
-              zoom: 13,
-              essential: true
-            });
-          },
-          function () {
-            alert('Could not get your location');
-          }
-        );
+      document.getElementById('locate').addEventListener('click', function () {
+        if (!navigator.geolocation) return alert('No geolocation');
+        navigator.geolocation.getCurrentPosition(function (pos) {
+          map.flyTo({ center: [pos.coords.longitude, pos.coords.latitude], zoom: 13 });
+        }, function () { alert('Location unavailable'); });
       });
 
-      const panel = document.getElementById('infoPanel');
-      document.getElementById('btnInfo').addEventListener('click', function () {
-        panel.classList.toggle('hidden');
+      var info = document.getElementById('info');
+      document.getElementById('toggleInfo').addEventListener('click', function () {
+        info.classList.toggle('hidden');
       });
-      document.getElementById('btnCloseInfo').addEventListener('click', function () {
-        panel.classList.add('hidden');
+      document.getElementById('closeInfo').addEventListener('click', function () {
+        info.classList.add('hidden');
       });
     })();
   </script>
