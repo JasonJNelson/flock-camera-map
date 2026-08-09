@@ -4,7 +4,7 @@ Interactive nationwide map of **Flock Safety** and other automated license plate
 
 Data comes from the open OpenStreetMap database via public Overpass API mirrors (the same source used by projects like DeFlock).
 
-**Live demo:** Open `index.html` or enable GitHub Pages.
+**Live demo:** https://JasonJNelson.github.io/flock-camera-map/ (after first successful deploy)
 
 ## Features
 
@@ -16,16 +16,28 @@ Data comes from the open OpenStreetMap database via public Overpass API mirrors 
 - Educational panel explaining what Flock cameras do
 - Multiple Overpass mirrors with automatic fallback for reliability
 
-## Quick Start
+## CI/CD
 
-### Option 1 — GitHub Pages (recommended)
-1. Go to the repository **Settings → Pages**
-2. Set Source to **Deploy from a branch**
-3. Select branch `main` and folder `/ (root)`
-4. Save — your map will be available at  
-   `https://JasonJNelson.github.io/flock-camera-map/`
+This repository uses **GitHub Actions**:
 
-### Option 2 — Local
+| Workflow | File | Trigger | Purpose |
+|----------|------|---------|---------|
+| **CI** | `.github/workflows/ci.yml` | Push & Pull Request to `main` | Validates HTML, checks required files and critical JS functions |
+| **Deploy** | `.github/workflows/deploy.yml` | Push to `main` + manual | Builds and deploys the static site to GitHub Pages |
+
+### Enable GitHub Pages (one-time)
+
+1. Go to the repository → **Settings** → **Pages**
+2. Under **Build and deployment** → **Source**, select **GitHub Actions**
+3. The next push to `main` (or a manual workflow run) will publish the site
+
+Live URL will be:  
+`https://JasonJNelson.github.io/flock-camera-map/`
+
+You can also trigger a deploy manually from the **Actions** tab → **Deploy to GitHub Pages** → **Run workflow**.
+
+## Quick Start (local)
+
 ```bash
 git clone https://github.com/JasonJNelson/flock-camera-map.git
 cd flock-camera-map
@@ -59,6 +71,7 @@ Contribute missing or incorrect cameras via the [DeFlock app](https://deflock.me
 - Overpass API (multiple public mirrors)
 - Nominatim for geocoding
 - Carto dark basemap
+- GitHub Actions for CI + Pages deployment
 
 ## Disclaimer
 
