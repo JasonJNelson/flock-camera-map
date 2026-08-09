@@ -25,7 +25,6 @@ jobs:
 
       - name: Validate index.html
         run: |
-          # Create a minimal config that is not overly strict for a single-file app
           cat > .htmlvalidate.json << 'EOF'
           {
             "extends": ["html-validate:recommended"],
@@ -46,25 +45,26 @@ jobs:
 
       - name: Basic file checks
         run: |
-          echo "Checking required files exist..."
-          test -f index.html && echo "✅ index.html present"
-          test -f README.md && echo "✅ README.md present"
-          echo "File sizes:"
+          test -f index.html && echo "index.html present"
+          test -f README.md && echo "README.md present"
           ls -lh index.html README.md
 
-      - name: Syntax check (JS inside HTML)
+      - name: Syntax check (map app markers)
         run: |
-          # Extract script content and do a very basic syntax check with node
           node -e "
             const fs = require('fs');
             const html = fs.readFileSync('index.html', 'utf8');
-            const match = html.match(/<script>([\s\S]*?)<\/script>/g);
-            if (!match) { console.log('No inline scripts found'); process.exit(0); }
-            console.log('Found', match.length, 'script block(s)');
-            // Basic check that key functions exist
-            if (!html.includes('loadCameras') || !html.includes('fetchWithFallback')) {
-              console.error('Missing critical functions');
-              process.exit(1);
+            const checks = [
+              ['maplibre-gl', html.includes('maplibre-gl')],
+              ['map container', html.includes('id=\"map\"') || html.includes(\"id='map'\")],
+              ['camera tiles', html.includes('tiles.dontgetflocked.com')],
+              ['heatmap or points', html.includes('heatmap') || html.includes('circle')],
+            ];
+            let ok = true;
+            for (const [name, pass] of checks) {
+              console.log((pass ? 'OK' : 'MISSING') + ' - ' + name);
+              if (!pass) ok = false;
             }
-            console.log('✅ Critical functions present');
+            if (!ok) process.exit(1);
+            console.log('Critical map pieces present');
           "
